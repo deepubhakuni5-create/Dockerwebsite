@@ -64,7 +64,7 @@ stages {
                     passwordVariable: 'DOCKER_PASSWORD'
                 )
             ]) {
-                powershell '''
+                bat '''
                     $env:DOCKER_PASSWORD | & "$env:DOCKER_EXE" login -u "$env:DOCKER_USERNAME" --password-stdin
 
                     if ($LASTEXITCODE -ne 0) {
