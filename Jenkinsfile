@@ -1,11 +1,9 @@
 pipeline {
 agent any
-
-```
 environment {
     IMAGE_NAME = "deepu09567/dockerwebsite"
-    IMAGE_TAG  = "${BUILD_NUMBER}"
-    DOCKER_EXE  = "C:\\Users\\Ankit\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe"
+    IMAGE_TAG = "${BUILD_NUMBER}"
+    DOCKER_EXE = "C:\\Users\\Ankit\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe"
 }
 
 stages {
@@ -32,7 +30,7 @@ stages {
 
     stage('Push to Docker Hub') {
         steps {
-            echo 'Logging in to Docker Hub and pushing image...'
+            echo 'Logging in to Docker Hub...'
 
             withCredentials([
                 usernamePassword(
@@ -53,7 +51,7 @@ stages {
 
     stage('Update k8s.yaml Image Tag') {
         steps {
-            echo "Updating k8s.yaml..."
+            echo 'Updating Kubernetes image tag...'
 
             powershell """
                 (Get-Content k8s.yaml) -replace 'image:\\s*${IMAGE_NAME}:.*', 'image: ${IMAGE_NAME}:${IMAGE_TAG}' | Set-Content k8s.yaml
@@ -73,6 +71,7 @@ stages {
 }
 
 post {
+
     success {
         echo "Deployed ${IMAGE_NAME}:${IMAGE_TAG} successfully."
     }
@@ -87,6 +86,4 @@ post {
         """
     }
 }
-```
-
 }
