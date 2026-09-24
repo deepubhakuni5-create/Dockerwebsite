@@ -7,8 +7,7 @@ environment {
 }
 
 stages {
-
-    stage('Checkout') {
+  stage('Checkout') {
         steps {
             echo 'Checking out source code...'
 
@@ -16,7 +15,6 @@ stages {
                 url: 'https://github.com/deepubhakuni5-create/Dockerwebsite.git'
         }
     }
-
     stage('Build Docker Image') {
         steps {
             echo "Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
@@ -27,7 +25,6 @@ stages {
             """
         }
     }
-
     stage('Test Docker Hub Credential') {
         steps {
             echo 'Testing Docker Hub credential...'
@@ -52,30 +49,30 @@ stages {
             }
         }
     }
-
-    stage('Login to Docker Hub') {
-        steps {
-            echo 'Logging in to Docker Hub...'
-
-            withCredentials([
-                usernamePassword(
-                    credentialsId: 'dockerhub-deepcreds',
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )
-            ]) {
-                bat '''
-                    $env:DOCKER_PASSWORD | & "$env:DOCKER_EXE" login -u "$env:DOCKER_USERNAME" --password-stdin
-
-                    if ($LASTEXITCODE -ne 0) {
+stage('Login to Docker Hub') {
+steps {
+echo 'Logging in to Docker Hub...'
+    withCredentials([
+        usernamePassword(
+            credentialsId: 'dockerhub-deepcreds',
+            usernameVariable: 'DOCKER_USERNAME',
+            passwordVariable: 'DOCKER_PASSWORD'
+        )
+    ]) {
+        bat '''
+            echo %DOCKER_PASSWORD% | "%DOCKER_EXE%" login -u "%DOCKER_USERNAME%" --password-stdin
+        '''
+    }
+}
+}
+                if ($LASTEXITCODE -ne 0) {
                         exit $LASTEXITCODE
                     }
                 '''
             }
         }
     }
-
-    stage('Push to Docker Hub') {
+   stage('Push to Docker Hub') {
         steps {
             echo "Pushing ${IMAGE_NAME}:${IMAGE_TAG} to Docker Hub..."
 
@@ -85,7 +82,6 @@ stages {
             """
         }
     }
-
     stage('Update k8s.yaml Image Tag') {
         steps {
             echo "Updating Kubernetes image tag..."
@@ -95,7 +91,6 @@ stages {
                     Write-Error "k8s.yaml file not found!"
                     exit 1
                 }
-
                 (Get-Content "k8s.yaml") -replace 'image:\\s*${IMAGE_NAME}:.*', 'image: ${IMAGE_NAME}:${IMAGE_TAG}' | Set-Content "k8s.yaml"
             """
         }
@@ -111,23 +106,19 @@ stages {
         }
     }
 }
-
 post {
-
     success {
         echo "========================================"
         echo "Pipeline completed successfully!"
         echo "Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
         echo "========================================"
     }
-
     failure {
         echo "========================================"
         echo "Pipeline FAILED!"
         echo "Check the Console Output."
         echo "========================================"
     }
-
     always {
         bat """
             "${DOCKER_EXE}" logout
