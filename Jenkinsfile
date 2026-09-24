@@ -39,9 +39,9 @@ stages {
                     passwordVariable: 'DOCKER_PASSWORD'
                 )
             ]) {
-                bat """
-                    echo %DOCKER_PASSWORD% | "${DOCKER_EXE}" login -u "%DOCKER_USERNAME%" --password-stdin
-                """
+                powershell '''
+                    $env:DOCKER_PASSWORD | & "$env:DOCKER_EXE" login -u "$env:DOCKER_USERNAME" --password-stdin
+                '''
             }
         }
     }
@@ -59,7 +59,7 @@ stages {
 
     stage('Update k8s.yaml Image Tag') {
         steps {
-            echo "Updating Kubernetes image to ${IMAGE_NAME}:${IMAGE_TAG}..."
+            echo "Updating Kubernetes image tag to ${IMAGE_TAG}..."
 
             powershell """
                 (Get-Content k8s.yaml) -replace 'image:\\s*${IMAGE_NAME}:.*', 'image: ${IMAGE_NAME}:${IMAGE_TAG}' | Set-Content k8s.yaml
@@ -81,7 +81,8 @@ stages {
 post {
 
     success {
-        echo "Deployment successful: ${IMAGE_NAME}:${IMAGE_TAG}"
+        echo "Deployment successful!"
+        echo "Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
     }
 
     failure {
@@ -91,7 +92,6 @@ post {
     always {
         bat """
             "${DOCKER_EXE}" logout
-            "${DOCKER_EXE}" system prune -f
         """
     }
 }
