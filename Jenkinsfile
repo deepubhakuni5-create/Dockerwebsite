@@ -3,9 +3,7 @@ agent any
 environment {
     IMAGE_NAME = "deepu09567/dockerwebsite"
     IMAGE_TAG = "${BUILD_NUMBER}"
-
     DOCKER_EXE = "C:\\Users\\Ankit\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe"
-
     DOCKER_CONFIG = "${WORKSPACE}\\.docker"
 }
 
@@ -26,7 +24,6 @@ stages {
 
             bat """
                 if not exist "%DOCKER_CONFIG%" mkdir "%DOCKER_CONFIG%"
-
                 "%DOCKER_EXE%" build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 "%DOCKER_EXE%" tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
             """
@@ -109,5 +106,36 @@ stages {
         }
     }
 
-    stage('Deploy to Minikube')
+    stage('Deploy to Minikube') {
+        steps {
+            echo 'Deploying application to Minikube...'
 
+            bat '''
+                kubectl apply -f k8s.yaml
+            '''
+        }
+    }
+}
+
+post {
+    success {
+        echo "========================================"
+        echo "Pipeline completed successfully!"
+        echo "Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+        echo "========================================"
+    }
+
+    failure {
+        echo "========================================"
+        echo "Pipeline FAILED!"
+        echo "Check the Console Output."
+        echo "========================================"
+    }
+
+    always {
+        bat '''
+            "%DOCKER_EXE%" logout
+        '''
+    }
+}
+}
