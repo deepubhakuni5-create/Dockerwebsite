@@ -28,7 +28,7 @@ stages {
         }
     }
 
-    stage('Push to Docker Hub') {
+    stage('Login to Docker Hub') {
         steps {
             echo 'Logging in to Docker Hub...'
 
@@ -40,18 +40,26 @@ stages {
                 )
             ]) {
                 bat """
-                    "${DOCKER_EXE}" login -u "%DOCKER_USERNAME%" -p "%DOCKER_PASSWORD%"
-                    "${DOCKER_EXE}" push ${IMAGE_NAME}:${IMAGE_TAG}
-                    "${DOCKER_EXE}" push ${IMAGE_NAME}:latest
-                    "${DOCKER_EXE}" logout
+                    echo %DOCKER_PASSWORD% | "${DOCKER_EXE}" login -u "%DOCKER_USERNAME%" --password-stdin
                 """
             }
         }
     }
 
+    stage('Push to Docker Hub') {
+        steps {
+            echo "Pushing ${IMAGE_NAME}:${IMAGE_TAG} to Docker Hub..."
+
+            bat """
+                "${DOCKER_EXE}" push ${IMAGE_NAME}:${IMAGE_TAG}
+                "${DOCKER_EXE}" push ${IMAGE_NAME}:latest
+            """
+        }
+    }
+
     stage('Update k8s.yaml Image Tag') {
         steps {
-            echo 'Updating Kubernetes image tag...'
+            echo "Updating Kubernetes image to ${IMAGE_NAME}:${IMAGE_TAG}..."
 
             powershell """
                 (Get-Content k8s.yaml) -replace 'image:\\s*${IMAGE_NAME}:.*', 'image: ${IMAGE_NAME}:${IMAGE_TAG}' | Set-Content k8s.yaml
@@ -73,15 +81,16 @@ stages {
 post {
 
     success {
-        echo "Deployed ${IMAGE_NAME}:${IMAGE_TAG} successfully."
+        echo "Deployment successful: ${IMAGE_NAME}:${IMAGE_TAG}"
     }
 
     failure {
-        echo "Pipeline failed - check console output."
+        echo "Pipeline failed - check Console Output."
     }
 
     always {
         bat """
+            "${DOCKER_EXE}" logout
             "${DOCKER_EXE}" system prune -f
         """
     }
