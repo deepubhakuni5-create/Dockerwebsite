@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dockerwebsite-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: dockerwebsite
+  template:
+    metadata:
+      labels:
+        app: dockerwebsite
+    spec:
+      containers:
+        - name: dockerwebsite
+          image: deepu09567/dockerwebsite:latest
+          ports:
+            - containerPort: 6765
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dockerwebsite-service
+spec:
+  type: NodePort
+  selector:
+    app: dockerwebsite
+  ports:
+    - port: 6765
+      targetPort: 6765
+      nodePort: 30765
