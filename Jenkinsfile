@@ -1,8 +1,8 @@
+```groovy
 pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
         IMAGE_NAME = "deepu09567/dockerwebsite"
         IMAGE_TAG  = "${BUILD_NUMBER}"
     }
@@ -11,40 +11,62 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/deepubhakuni5-create/Dockerwebsite.git'
+                echo 'Checking out source code...'
+
+                git branch: 'main',
+                    url: 'https://github.com/deepubhakuni5-create/Dockerwebsite.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
-                }
+                echo "Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
+
+                bat """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
+                """
             }
         }
 
         stage('Push to Docker Hub') {
             steps {
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-creds') {
-                        dockerImage.push("${IMAGE_TAG}")
-                        dockerImage.push("latest")
-                    }
+                echo 'Logging in to Docker Hub and pushing image...'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    bat """
+                        docker login -u "%DOCKER_USERNAME%" -p "%DOCKER_PASSWORD%"
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
+                        docker logout
+                    """
                 }
             }
         }
 
         stage('Update k8s.yaml Image Tag') {
             steps {
-                sh """
-                    sed -i 's|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' k8s.yaml
+                echo "Updating k8s.yaml with image ${IMAGE_NAME}:${IMAGE_TAG}"
+
+                powershell """
+                    (Get-Content k8s.yaml) -replace 'image:\\s*${IMAGE_NAME}:.*', 'image: ${IMAGE_NAME}:${IMAGE_TAG}' | Set-Content k8s.yaml
                 """
             }
         }
 
         stage('Deploy to Minikube') {
             steps {
-                sh 'kubectl apply -f k8s.yaml'
+                echo 'Deploying application to Minikube...'
+
+                bat """
+                    kubectl apply -f k8s.yaml
+                """
             }
         }
     }
@@ -53,11 +75,16 @@ pipeline {
         success {
             echo "✅ Deployed ${IMAGE_NAME}:${IMAGE_TAG} successfully."
         }
+
         failure {
             echo "❌ Pipeline failed — check console output."
         }
+
         always {
-            sh 'docker system prune -f || true'
+            bat """
+                docker system prune -f
+            """
         }
     }
 }
+```
