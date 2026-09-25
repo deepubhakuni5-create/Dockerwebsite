@@ -1,141 +1,65 @@
 pipeline {
-agent any
-environment {
-    IMAGE_NAME = "deepu09567/dockerwebsite"
-    IMAGE_TAG = "${BUILD_NUMBER}"
-    DOCKER_EXE = "C:\\Users\\Ankit\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe"
-    DOCKER_CONFIG = "${WORKSPACE}\\.docker"
-}
+    agent any
 
-stages {
-
-    stage('Checkout') {
-        steps {
-            echo 'Checking out source code...'
-
-            git branch: 'main',
-                url: 'https://github.com/deepubhakuni5-create/Dockerwebsite.git'
-        }
+    environment {
+        DOCKER = 'C:\\Users\\Ankit\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
     }
 
-    stage('Build Docker Image') {
-        steps {
-            echo "Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
+    stages {
 
-            bat """
-                if not exist "%DOCKER_CONFIG%" mkdir "%DOCKER_CONFIG%"
-                "%DOCKER_EXE%" build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                "%DOCKER_EXE%" tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-            """
-        }
-    }
+        stage('Docker Version Test') {
+            steps {
+                echo 'Testing Docker...'
 
-    stage('Test Docker Hub Credential') {
-        steps {
-            echo 'Testing Docker Hub credential...'
-
-            withCredentials([
-                usernamePassword(
-                    credentialsId: 'dockerhub-deepcreds',
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )
-            ]) {
                 bat '''
-                    echo Username: %DOCKER_USERNAME%
-
-                    if "%DOCKER_PASSWORD%"=="" (
-                        echo PASSWORD IS EMPTY
-                        exit /b 1
-                    ) else (
-                        echo PASSWORD RECEIVED
-                    )
+                    "%DOCKER%" version
                 '''
             }
         }
-    }
 
-    stage('Login to Docker Hub') {
-        steps {
-            echo 'Logging in to Docker Hub...'
+        stage('Docker Hub Login') {
+            steps {
+                echo 'Logging into Docker Hub...'
 
-            withCredentials([
-                usernamePassword(
-                    credentialsId: 'dockerhub-deepcreds',
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )
-            ]) {
-                bat '''
-                    echo %DOCKER_PASSWORD% | "%DOCKER_EXE%" login -u "%DOCKER_USERNAME%" --password-stdin
-
-                    if %ERRORLEVEL% NEQ 0 (
-                        echo Docker Hub login failed
-                        exit /b 1
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
                     )
-                '''
-            }
-        }
-    }
+                ]) {
 
-    stage('Push to Docker Hub') {
-        steps {
-            echo "Pushing ${IMAGE_NAME}:${IMAGE_TAG} to Docker Hub..."
+                    bat '''
+                        echo Docker username: %DOCKER_USER%
+                        echo Docker password received from Jenkins.
 
-            bat """
-                "%DOCKER_EXE%" push ${IMAGE_NAME}:${IMAGE_TAG}
-                "%DOCKER_EXE%" push ${IMAGE_NAME}:latest
-            """
-        }
-    }
+                        echo %DOCKER_PASS% | "%DOCKER%" login -u "%DOCKER_USER%" --password-stdin
 
-    stage('Update k8s.yaml Image Tag') {
-        steps {
-            echo "Updating Kubernetes image tag to ${IMAGE_TAG}..."
+                        if %ERRORLEVEL% NEQ 0 (
+                            echo.
+                            echo ==============================
+                            echo DOCKER HUB LOGIN FAILED
+                            echo ==============================
+                            exit /b 1
+                        )
 
-            powershell """
-                if (!(Test-Path "k8s.yaml")) {
-                    Write-Error "k8s.yaml file not found!"
-                    exit 1
+                        echo.
+                        echo ==============================
+                        echo DOCKER HUB LOGIN SUCCESSFUL
+                        echo ==============================
+                    '''
                 }
-
-                (Get-Content "k8s.yaml") -replace 'image:\\s*${IMAGE_NAME}:.*', 'image: ${IMAGE_NAME}:${IMAGE_TAG}' | Set-Content "k8s.yaml"
-
-                Write-Host "k8s.yaml updated successfully."
-            """
+            }
         }
     }
 
-    stage('Deploy to Minikube') {
-        steps {
-            echo 'Deploying application to Minikube...'
+    post {
+        success {
+            echo 'Docker Hub login test PASSED.'
+        }
 
-            bat '''
-                kubectl apply -f k8s.yaml
-            '''
+        failure {
+            echo 'Docker Hub login test FAILED.'
         }
     }
-}
-
-post {
-    success {
-        echo "========================================"
-        echo "Pipeline completed successfully!"
-        echo "Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
-        echo "========================================"
-    }
-
-    failure {
-        echo "========================================"
-        echo "Pipeline FAILED!"
-        echo "Check the Console Output."
-        echo "========================================"
-    }
-
-    always {
-        bat '''
-            "%DOCKER_EXE%" logout
-        '''
-    }
-}
 }
